@@ -1,86 +1,96 @@
-#include <ESP8266WiFi.h>                      // Подключаем библиотеку ESP8266WiFi
+#include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 #include "secrets.h"
 
-#define RELAY 0                               // Пин к которому подключен датчик
-WiFiServer server(80);                        // Указываем порт Web-сервера
- 
+#define RELAY 0
+WiFiServer server(80);
 void setup(){
-  delay(2200);      
-  Serial.begin(115200);                       // Скорость передачи 115200 
-  pinMode(RELAY,OUTPUT);                      // Указываем вывод RELAY как выход
-  digitalWrite(RELAY, LOW);                   // Устанавливаем RELAY в LOW (0В)
-  Serial.println();                           // Печать пустой строки 
-  Serial.print("Connecting to ");             // Печать "Подключение к:"
-  Serial.println(SECRET_SSID);                       // Печать "Название Вашей WiFi сети"
- 
-  WiFi.begin(SECRET_SSID, SECRET_PASSWORD);                 // Подключение к WiFi Сети
- 
-  while (WiFi.status() != WL_CONNECTED)       // Проверка подключения к WiFi сети
-  { 
-    delay(500);                               // Пауза 500 мкс
-    Serial.print(".");                        // Печать "."
+  delay(2200);
+  Serial.begin(115200);
+  pinMode(RELAY,OUTPUT);
+  digitalWrite(RELAY, LOW);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(SECRET_SSID, SECRET_PASSWORD);
+
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
   }
-  Serial.println("");                         // Печать пустой строки  
-  Serial.println("WiFi connected");           // Печать "WiFi connected"
- 
-  server.begin();                             // Запуск сервера
-  Serial.println("Server started");           // Печать "Server starte"
-  Serial.print("Use this URL to connect: ");  // Печать "Use this URL to connect:" 
-  Serial.print(WiFi.localIP());               // Печать выданого IP адресса          
+  
+  setupOTA();
+  
+  server.begin();
 }
  
 void loop(){
-   WiFiClient client = server.available();    // Получаем данные, посылаемые клиентом 
+  ArduinoOTA.handle();
+  WiFiClient client = server.available();
   if (!client)                                
   {
     return;
   }
-  Serial.println("new client");               // Отправка "new client"
-  while(!client.available())                  // Пока есть соединение с клиентом 
+  while(!client.available())
   {
-    delay(1);                                 // пауза 1 мс
+    delay(1);
   }
 
-  String request = client.readStringUntil('\r');
-  Serial.println(request);
-  client.flush();
- 
-  int value = LOW;
-  if (request.indexOf("/RELAY=ON") != -1)  
-  {
-    Serial.println("RELAY=ON");
-    digitalWrite(RELAY,LOW);
-    value = LOW;
-  }
-  if (request.indexOf("/RELAY=OFF") != -1)  
-  {
-    Serial.println("RELAY=OFF");
-    digitalWrite(RELAY,HIGH);
-    value = HIGH;
-  }
-
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-Type: text/html");
-  client.println(""); 
-  client.println("<!DOCTYPE HTML>");
-  client.println("<html>");
-  client.println("<head><title>ESP8266 RELAY Control</title></head>");
-  client.print("Relay is now: ");
- 
-  if(value == HIGH) 
-  {
-    client.print("OFF");
-  } 
-  else 
-  {
-    client.print("ON");
-  }
-  client.println("<br><br>");
-  client.println("Turn <a href=\"/RELAY=OFF\">OFF</a> RELAY<br>");
-  client.println("Turn <a href=\"/RELAY=ON\">ON</a> RELAY<br>");
-    client.println("</html>");
- 
+  routeRequest(client);
   delay(1);
-  Serial.println("Client disonnected");
-  Serial.println("");
+  client.stop();
+}
+
+void routeRequest(WiFiClient client){
+  String request = client.readStringUntil('\r');
+  client.flush();
+  
+  int value = LOW;
+  if (request.indexOf("/STATUS") != -1)
+  {
+    client.print(status());
+  } else if (request.indexOf("/RELAY=ON") != -1)  
+  {
+    client.print(switchState(LOW));
+  } else if (request.indexOf("/RELAY=OFF") != -1)  
+  {
+    client.print(switchState(HIGH));
+  }
+}
+
+String status(){
+  if (digitalRead(RELAY) == LOW)
+    return "ON";
+  else 
+    return "OFF";
+}
+
+String switchState(int value){
+  digitalWrite(RELAY,value);
+  if (value == LOW) 
+    return "ON";
+  else 
+    return "OFF";
+}
+
+void setupOTA(){
+  ArduinoOTA.onStart([]() {
+    Serial.println("Start");
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+  ArduinoOTA.begin();
 }

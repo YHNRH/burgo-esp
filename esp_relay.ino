@@ -39,39 +39,44 @@ void loop(){
 
   routeRequest(client);
   delay(1);
-  client.stop();
+  //client.stop();
 }
 
 void routeRequest(WiFiClient client){
   String request = client.readStringUntil('\r');
   client.flush();
-  
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/json");
+  client.println("");
   int value = LOW;
   if (request.indexOf("/STATUS") != -1)
   {
-    client.print(status());
+    client.println(status());
   } else if (request.indexOf("/RELAY=ON") != -1)  
   {
-    client.print(switchState(LOW));
+    client.println(switchState(LOW));
   } else if (request.indexOf("/RELAY=OFF") != -1)  
   {
-    client.print(switchState(HIGH));
+    client.println(switchState(HIGH));
   }
 }
 
 String status(){
-  if (digitalRead(RELAY) == LOW)
-    return "ON";
-  else 
-    return "OFF";
+  return getStatusJson(digitalRead(RELAY));
 }
 
 String switchState(int value){
   digitalWrite(RELAY,value);
-  if (value == LOW) 
-    return "ON";
-  else 
-    return "OFF";
+  return getStatusJson(value);
+}
+
+String getStatusJson(int value){
+  if (value == LOW)
+    return "{\"status\": \"ON\"}";
+  else if (value == HIGH)
+    return "{\"status\": \"OFF\"}";
+  else
+    return "{\"status\": \"UNDEFINED\"}";
 }
 
 void setupOTA(){

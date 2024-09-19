@@ -24,7 +24,7 @@ void setup(){
   
   server.begin();
 }
- 
+
 void loop(){
   ArduinoOTA.handle();
   WiFiClient client = server.available();
@@ -72,11 +72,8 @@ String switchState(int value){
 
 String getStatusJson(int value){
   if (value == LOW)
-    return "{\"status\": \"ON\"}";
   else if (value == HIGH)
-    return "{\"status\": \"OFF\"}";
   else
-    return "{\"status\": \"UNDEFINED\"}";
 }
 
 void setupOTA(){

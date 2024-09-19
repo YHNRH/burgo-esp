@@ -71,9 +71,17 @@ String switchState(int value){
 }
 
 String getStatusJson(int value){
+  String obj = "{\"Id\": ";
+  obj += Id;
+  obj += ", \"status\": \"";
   if (value == LOW)
+    obj += "ON";
   else if (value == HIGH)
+    obj += "OFF";
   else
+    obj += "UNDEFINED";
+  obj += "\"}";
+  return obj;
 }
 
 void setupOTA(){
